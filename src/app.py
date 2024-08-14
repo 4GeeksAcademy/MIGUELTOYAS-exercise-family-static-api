@@ -7,78 +7,73 @@ from flask_cors import CORS
 from utils import APIException, generate_sitemap
 from datastructures import FamilyStructure
 
-
-#from models import Person
 app = Flask(__name__)
-app.url_map.strict_slashes = False
 CORS(app)
 
-# create the jackson family object
-jackson_family = FamilyStructure("Jackson")
-
-# initial members:
+# Añadir miembros iniciales manualmente
 initial_members = [
     {
-        "name": "John",
-        "last_name": 
-
+        "first_name": "John",
+        "age": 33,
+        "lucky_numbers": [7, 13, 22]
+    },
+    {
+        "first_name": "Jane",
+        "age": 35,
+        "lucky_numbers": [10, 14, 3]
+    },
+    {
+        "first_name": "Jimmy",
+        "age": 5,
+        "lucky_numbers": [1]
     }
 ]
 
-# Handle/serialize errors like a JSON object
+# Crear la instancia de la familia Jackson
+jackson_family = FamilyStructure('Jackson')
+
+for member in initial_members:
+    jackson_family.add_member(member)
+
+# Manejo de errores para respuestas JSON
 @app.errorhandler(APIException)
 def handle_invalid_usage(error):
     return jsonify(error.to_dict()), error.status_code
 
-# generate sitemap with all your endpoints
+# Generación del sitemap con todos los endpoints
 @app.route('/')
 def sitemap():
     return generate_sitemap(app)
 
 @app.route('/members', methods=['GET'])
-def handle_hello():
-
-    # this is how you can use the Family datastructure by calling its methods
+def get_all_members():
     members = jackson_family.get_all_members()
-    response_body = {
-        "hello": "world",
-        "family": members
-    }
+    return jsonify(members), 200
 
+@app.route('/member/<int:member_id>', methods=['GET'])
+def get_member(member_id):
+    member = jackson_family.get_member(member_id)
+    if member:
+        return jsonify(member), 200
+    return jsonify({"error": "Member not found"}), 404
 
-    return jsonify(response_body), 200
+@app.route('/member', methods=['POST'])
+def add_member():
+    new_member = request.json
+    if not new_member or 'first_name' not in new_member or 'age' not in new_member or 'lucky_numbers' not in new_member:
+        return jsonify({"error": "Invalid request body"}), 400
+    jackson_family.add_member(new_member)
+    return jsonify({"message": "Member added successfully"}), 200
 
-class FamilyStructure:
-    def __init__(self, last_name):
-        self.last_name = last_name
-        self._next_id = 1
-        self._members = []
+@app.route('/member/<int:member_id>', methods=['DELETE'])
+def delete_member(member_id):
+    member = jackson_family.get_member(member_id)
+    if member:
+        jackson_family.delete_member(member_id)
+        return jsonify({"done": True}), 200
+    return jsonify({"error": "Member not found"}), 404
 
-    # Este método genera un 'id' único al agregar miembros a la lista (no debes modificar esta función)
-    def _generate_id(self):
-        generated_id = self._next_id
-        self._next_id += 1
-        return generated_id
-
-    def add_member(self, member):
-        ## Debes implementar este método
-        ## Agrega un nuevo miembro a la lista de _members
-        pass
-
-    def delete_member(self, id):
-        ## Debes implementar este método
-        ## Recorre la lista y elimina el miembro con el id proporcionado
-        pass
-
-    def get_member(self, id):
-        ## Debes implementar este método
-        ## Recorre la lista y obtén el miembro con el id proporcionado
-        pass
-
-    def get_all_members(self, id):
-        return self._members
-
-# this only runs if `$ python src/app.py` is executed
+# Este bloque se asegura de que la app se ejecute en modo debug y en el puerto correcto.
 if __name__ == '__main__':
     PORT = int(os.environ.get('PORT', 3000))
     app.run(host='0.0.0.0', port=PORT, debug=True)
